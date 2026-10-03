@@ -80,6 +80,8 @@ input:disabled{opacity:.45}
 .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 .row .btn{width:auto;flex:1 1 140px}
 code{font:400 .8rem var(--mono);overflow-wrap:anywhere;color:var(--ink)}
+.btn.ghost.armed{border-color:var(--err);color:var(--err);font-weight:700}
+#mk-tpl{grid-column:1/-1}
 footer{margin-top:28px;color:var(--muted);font-size:.82rem;max-width:70ch}
 
 @media (min-width:821px){
@@ -125,7 +127,7 @@ footer{margin-top:28px;color:var(--muted);font-size:.82rem;max-width:70ch}
 
    <details id="tpl-box">
     <summary>Use my own config as a template</summary>
-    <p class="hint" style="margin-top:6px">Paste or load a working WARP config. The new config keeps your settings (endpoint, DNS, MTU, AmneziaWG parameters, comments). Only the private key, the address and the server key are replaced with fresh ones from Cloudflare. Your template stays in this browser.</p>
+    <p class="hint" style="margin-top:6px">Paste or load a working WARP config. The new config keeps your settings (endpoint, DNS, MTU, AmneziaWG parameters, comments). Only the private key, the address and the server key are replaced with fresh ones from Cloudflare. Your template stays in this browser and is kept here between visits (the old private key is never saved).</p>
     <textarea id="tpl" wrap="off" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="Template config" placeholder="[Interface]&#10;PrivateKey = ...&#10;..."></textarea>
     <div class="row">
      <button class="btn ghost" id="tpl-pick" type="button">Load .conf file</button>
@@ -161,6 +163,7 @@ footer{margin-top:28px;color:var(--muted);font-size:.82rem;max-width:70ch}
      <button class="btn" id="share" type="button" hidden>Share file</button>
      <button class="btn ghost" id="copy" type="button">Copy config</button>
      <button class="btn ghost" id="reveal" type="button" aria-pressed="false">Show private key</button>
+     <button class="btn ghost" id="mk-tpl" type="button">Use as template</button>
     </div>
     <pre id="conf" tabindex="0"></pre>
     <div class="note">The config and the QR code contain your private key. Don't share them.</div>
@@ -424,13 +427,22 @@ function applyTemplate(text, priv, address, peerKey) {
   return out.join('\n') + '\n';
 }
 
+const TPL_KEY = 'awgwarp.template';
+const hideKey = t => t.replace(/^(\s*PrivateKey\s*=\s*).*$/gim, '$1(replaced when you generate)');
+function tplStore(v) {                       // true when the browser accepted the change
+  try { if (v) localStorage.setItem(TPL_KEY, v); else localStorage.removeItem(TPL_KEY); return true; }
+  catch { return false; }                    // storage blocked (private mode, strict settings)
+}
 function syncTpl() {
-  const t = $('#tpl').value.trim(), on = !!t;
+  const raw = $('#tpl').value, t = raw.trim(), on = !!t;
   const ok = /^\s*\[interface\]/im.test(t) && /^\s*\[peer\]/im.test(t);
+  // The template's own private key is replaced on every generate, so it is never written to storage.
+  const saved = tplStore(on ? hideKey(raw) : '');
   document.querySelectorAll('.fields input').forEach(i => { i.disabled = on; });
-  $('#tpl-msg').textContent = !on ? '' : ok
+  $('#tpl-msg').textContent = !on ? '' : (ok
     ? 'Template ready. Advanced settings are switched off while a template is in use.'
-    : 'This does not look like a config yet. It needs an [Interface] and a [Peer] section.';
+    : 'This does not look like a config yet. It needs an [Interface] and a [Peer] section.')
+    + (saved ? ' Kept in this browser; the old private key is not saved.' : ' Could not keep it in this browser.');
   $('#tpl-clear').hidden = !on;
 }
 
@@ -475,6 +487,7 @@ async function run() {
     $('#m-ep').textContent = endpoint; $('#m-addr').textContent = address;
     $('#m-acct').textContent = d.account_type || 'unknown'; $('#m-pub').textContent = pub;
     drawConf();
+    const mk = $('#mk-tpl'); mk.hidden = !!tplText; mk.disabled = false; mk.textContent = 'Use as template';   // pointless when it already came from a template
     $('#empty').hidden = true; $('#result').hidden = false;
     status('Done in ' + ((performance.now() - t0) / 1000).toFixed(1) + 's. Generate again for a fresh device.' + qrNote);
   } catch (e) {
@@ -487,8 +500,21 @@ async function run() {
 if (location.protocol.startsWith('http')) $('#ps-cmd').textContent = 'irm ' + location.origin + '/iex | iex';
 $('#go').onclick = run;
 $('#tpl').addEventListener('input', syncTpl);
+$('#mk-tpl').onclick = () => {
+  if ($('#tpl').value.trim()) return status('A template is already in use. Clear it first.', true);
+  $('#tpl').value = hideKey(state.conf);       // the new private key stays out of the box and out of storage
+  $('#tpl-box').open = true; syncTpl();
+  $('#mk-tpl').textContent = 'Saved as template'; $('#mk-tpl').disabled = true;
+  status('Saved as your template. Next time only the keys and address change. Advanced settings are off while it is in use.');
+};
 $('#tpl-pick').onclick = () => $('#tpl-file').click();
-$('#tpl-clear').onclick = () => { $('#tpl').value = ''; syncTpl(); };
+let clearTimer = 0;
+const disarmClear = () => { clearTimeout(clearTimer); const b = $('#tpl-clear'); b.textContent = 'Clear template'; b.classList.remove('armed'); b.dataset.armed = ''; };
+$('#tpl-clear').onclick = () => {            // two taps on purpose: the first arms it for 4 seconds
+  const b = $('#tpl-clear');
+  if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to clear'; b.classList.add('armed'); clearTimer = setTimeout(disarmClear, 4000); return; }
+  disarmClear(); $('#tpl').value = ''; syncTpl(); status('Template cleared.');
+};
 $('#tpl-file').onchange = async e => {
   const f = e.target.files[0]; e.target.value = '';
   if (!f) return;
@@ -521,6 +547,10 @@ $('#copy').onclick = async () => {
   try { await navigator.clipboard.writeText(state.conf); status('Config copied to the clipboard.'); }
   catch { status('Copy was blocked by the browser. Use Download .conf instead.', true); }
 };
+
+// Bring back the saved template after a refresh.
+try { const saved = localStorage.getItem(TPL_KEY); if (saved) { $('#tpl').value = saved; $('#tpl-box').open = true; } } catch {}
+syncTpl();
 </script>
 </body>
 </html>
