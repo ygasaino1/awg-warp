@@ -191,7 +191,26 @@ async function genKeys() {
 }
 
 /* ---------- WARP registration ---------- */
+const WARP_API = 'https://api.cloudflareclient.com/v0a5641/reg';
+// First try straight from the visitor's browser: it uses their own IP, so it isn't stuck in the
+// rate-limit bucket shared by every site hosted on Cloudflare. If the API refuses cross-site calls
+// (or fails), the server route below is the fallback.
+async function registerDirect(pub) {
+  const body = { key: pub, install_id: '', fcm_token: '', tos: new Date().toISOString().replace(/\.\d+Z$/, '.000Z'),
+    model: 'PC', serial_number: '', locale: 'en_US', os_version: '16.0.0', key_type: 'curve25519', tunnel_type: 'wireguard' };
+  const r = await fetch(WARP_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=UTF-8', 'CF-Client-Version': 'a-6.38.9-5641' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined,
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json(), c = d.config || {};
+  return { peer: (c.peers || [])[0], addresses: (c.interface || {}).addresses, account_type: (d.account || {}).account_type };
+}
+
 async function register(pub) {
+  try { return await registerDirect(pub); } catch {}
   let r;
   try {
     r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: pub }) });
@@ -200,7 +219,7 @@ async function register(pub) {
   if (r.status === 404) throw new Error('The /api/register function is not deployed. Add the functions folder to the repo and redeploy.');
   if (!r.ok) {
     const e = new Error((d.error || 'Registration failed (HTTP ' + r.status + ').') + (d.detail ? ' [' + d.detail + ']' : ''));
-    if (d.upstream === 429 || d.upstream === 403) e.hint = 'Cloudflare may be rate-limiting you. Wait a few minutes and try again.';
+    if (d.upstream === 429 || d.upstream === 403) e.hint = 'WARP is limiting how many sign-ups it accepts from this site\'s server. Wait a few minutes and try again.';
     throw e;
   }
   return d;
