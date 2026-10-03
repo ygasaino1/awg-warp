@@ -1,0 +1,13 @@
+# The web page. Strict policy: it may only talk to its own /api/register.
+/
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Cache-Control: no-cache
+
+# The script file itself: show as text in a browser instead of downloading.
+# (Never use "/*" with a Content-Type here: it would turn the web page into plain text.)
+/generateWarpAmnezia.ps1
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=300
+  X-Content-Type-Options: nosniff

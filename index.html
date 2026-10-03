@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#eef0f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1226" media="(prefers-color-scheme: dark)">
+<title>WARP for AmneziaWG</title>
+<meta name="description" content="Generate a Cloudflare WARP profile as an AmneziaWG config with a QR code. Keys are created in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%91%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef0f8;--panel:#fff;--ink:#141733;--muted:#5b6080;--line:#d5d9ea;
+  --accent:#4338ff;--on-accent:#fff;--warn:#a84a05;--warn-bg:#fff3e6;--err:#b3261e;
+  --sans:'Bricolage Grotesque',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1226;--panel:#171b36;--ink:#e9ebff;--muted:#9a9fc4;--line:#2a2f57;
+  --accent:#7c83ff;--on-accent:#0f1226;--warn:#ffb36b;--warn-bg:#2a2030;--err:#ff8a80;color-scheme:dark;
+}}
+/* Mobile first: everything below is the phone layout; min-width queries at the end add the desktop layout. */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;min-height:100vh;min-height:100dvh;background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--sans);
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.wrap{max-width:1040px;margin:0 auto;padding:24px 16px 40px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+h1{font-weight:800;font-size:clamp(2.1rem,11vw,3.9rem);line-height:1;letter-spacing:-.035em;margin:0 0 14px;overflow-wrap:anywhere}
+.lede{color:var(--muted);max-width:44ch;margin:0 0 22px;font-size:1.02rem}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:14px;width:100%;
+  min-height:52px;padding:12px 20px;font-weight:700;background:var(--accent);color:var(--on-accent)}
+.btn:hover{filter:brightness(1.08)}
+.btn[disabled]{opacity:.65;cursor:progress}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line);font-weight:500;min-height:48px;padding:10px 12px}
+.btn.ghost:hover{border-color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+details{margin-top:22px;border-top:1px solid var(--line);padding-top:6px}
+summary{cursor:pointer;font-weight:500;color:var(--muted);min-height:44px;display:flex;align-items:center}
+summary:hover{color:var(--ink)}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.fields .wide{grid-column:1/-1}
+@media (max-width:359px){.fields{grid-template-columns:1fr}}
+label{display:block;font-size:.88rem;color:var(--muted)}
+input{width:100%;min-height:46px;margin-top:4px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);
+  background:var(--panel);color:var(--ink);font:400 16px var(--mono)} /* 16px stops iOS from zooming on focus */
+input:focus{border-color:var(--accent);outline:none}
+.hint{font-size:.82rem;color:var(--muted);margin:10px 0 0}
+.status{min-height:1.6em;margin:12px 0 0;color:var(--muted);font-size:.92rem;overflow-wrap:anywhere}
+.status.err{color:var(--err)}
+.card{background:var(--panel);border:1.5px solid var(--line);border-radius:20px;padding:16px;min-width:0}
+.empty{display:grid;place-items:center;text-align:center;color:var(--muted);min-height:200px;
+  border:2px dashed var(--line);border-radius:14px;padding:20px}
+.empty svg{width:80px;height:80px;margin-bottom:10px;color:var(--line)}
+.result{display:flex;flex-direction:column;gap:18px}
+.actions{order:-1;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions .btn:not(.ghost){grid-column:1/-1}
+.top{display:flex;flex-direction:column;gap:18px}
+.qr{background:#fff;padding:10px;border-radius:12px;line-height:0;border:1px solid var(--line);width:min(100%,300px);margin:0 auto}
+.qr svg{width:100%;height:auto;display:block}
+dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;font-size:.88rem}
+dt{color:var(--muted)}
+dd{margin:0;font-family:var(--mono);font-size:.78rem;overflow-wrap:anywhere}
+pre{margin:0;padding:12px;border-radius:12px;background:var(--bg);border:1px solid var(--line);
+  font:400 .72rem/1.6 var(--mono);overflow-x:auto;white-space:pre;max-width:100%}
+.note{background:var(--warn-bg);color:var(--warn);border-radius:12px;padding:11px 14px;font-size:.88rem}
+.spin{width:16px;height:16px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:r .7s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
+textarea{width:100%;min-height:130px;margin-top:8px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);
+  background:var(--panel);color:var(--ink);font:400 16px/1.5 var(--mono);resize:vertical;overflow-x:auto}
+textarea:focus{border-color:var(--accent);outline:none}
+input:disabled{opacity:.45}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.row .btn{width:auto;flex:1 1 140px}
+code{font:400 .8rem var(--mono);overflow-wrap:anywhere;color:var(--ink)}
+footer{margin-top:28px;color:var(--muted);font-size:.82rem;max-width:70ch}
+
+@media (min-width:821px){
+  .wrap{padding:40px 24px 56px}
+  .grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:48px;align-items:start}
+  .lede{margin-bottom:28px}
+  #go{width:auto;display:inline-flex}
+  .card{padding:24px}
+  .empty{min-height:290px}
+  .actions{order:0;display:flex;flex-wrap:wrap}
+  .actions .btn{width:auto;padding-left:22px;padding-right:22px}
+  .top{flex-direction:row;align-items:flex-start;gap:22px}
+  .qr{width:200px;margin:0;flex:none}
+  dl{flex:1;min-width:0}
+  pre{font-size:.78rem}
+  footer{margin-top:40px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="grid">
+  <section>
+   <h1>WARP for AmneziaWG</h1>
+   <p class="lede">Make a Cloudflare WARP profile for the AmneziaWG app. Download the .conf file here, or scan the QR code from another device.</p>
+   <button class="btn" id="go" type="button">Generate config</button>
+   <p class="status" id="status" role="status" aria-live="polite"></p>
+
+   <details>
+    <summary>Advanced settings</summary>
+    <div class="fields">
+     <label class="wide">Endpoint (host:port)
+      <input id="endpoint" placeholder="Use the one Cloudflare assigns" inputmode="url" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"></label>
+     <label class="wide">DNS
+      <input id="dns" value="1.1.1.1, 2606:4700:4700::1111" autocomplete="off" spellcheck="false"></label>
+     <label>MTU <input id="mtu" type="number" inputmode="numeric" value="1280" min="576" max="1500"></label>
+     <label>Jc <input id="jc" type="number" inputmode="numeric" value="5" min="1" max="128"></label>
+     <label>Jmin <input id="jmin" type="number" inputmode="numeric" value="47" min="0" max="1280"></label>
+     <label>Jmax <input id="jmax" type="number" inputmode="numeric" value="98" min="0" max="1280"></label>
+    </div>
+    <p class="hint">Jc, Jmin and Jmax set the junk packets AmneziaWG sends to hide the handshake. The defaults match the PowerShell script.</p>
+   </details>
+
+   <details id="tpl-box">
+    <summary>Use my own config as a template</summary>
+    <p class="hint" style="margin-top:6px">Paste or load a working WARP config. The new config keeps your settings (endpoint, DNS, MTU, AmneziaWG parameters, comments). Only the private key, the address and the server key are replaced with fresh ones from Cloudflare. Your template stays in this browser.</p>
+    <textarea id="tpl" wrap="off" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="Template config" placeholder="[Interface]&#10;PrivateKey = ...&#10;..."></textarea>
+    <div class="row">
+     <button class="btn ghost" id="tpl-pick" type="button">Load .conf file</button>
+     <button class="btn ghost" id="tpl-clear" type="button" hidden>Clear template</button>
+    </div>
+    <input id="tpl-file" type="file" hidden>
+    <p class="hint" id="tpl-msg"></p>
+   </details>
+  </section>
+
+  <section class="card" aria-label="Result">
+   <div class="empty" id="empty">
+    <div>
+     <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="6" aria-hidden="true">
+      <rect x="6" y="6" width="28" height="28" rx="4"/><rect x="62" y="6" width="28" height="28" rx="4"/>
+      <rect x="6" y="62" width="28" height="28" rx="4"/><path d="M48 8v16M48 40h12M62 62h28M62 78h12M84 78v12M48 56v34"/>
+     </svg>
+     <p style="margin:0">Your QR code and config will appear here.</p>
+    </div>
+   </div>
+   <div class="result" id="result" hidden>
+    <div class="top">
+     <div class="qr" id="qr" aria-label="QR code of the config"></div>
+     <dl>
+      <dt>Endpoint</dt><dd id="m-ep"></dd>
+      <dt>Address</dt><dd id="m-addr"></dd>
+      <dt>Account</dt><dd id="m-acct"></dd>
+      <dt>Public key</dt><dd id="m-pub"></dd>
+     </dl>
+    </div>
+    <div class="actions">
+     <button class="btn" id="dl" type="button">Download .conf</button>
+     <button class="btn" id="share" type="button" hidden>Share file</button>
+     <button class="btn ghost" id="copy" type="button">Copy config</button>
+     <button class="btn ghost" id="reveal" type="button" aria-pressed="false">Show private key</button>
+    </div>
+    <pre id="conf" tabindex="0"></pre>
+    <div class="note">The config and the QR code contain your private key. Don't share them.</div>
+    <p class="hint" style="margin:0">On this device: open AmneziaWG, add a tunnel and import the .conf file. On another phone: tap + and scan the QR code.</p>
+   </div>
+  </section>
+ </div>
+ <footer>Keys are generated in your browser. Only the public key is sent to register a WARP device; the private key never leaves this page. Each click registers a new device.<br><br>On Windows you can also run this in PowerShell: <code id="ps-cmd"></code></footer>
+</div>
+
+<script>
+'use strict';
+const API_URL = '/api/register';
+const $ = s => document.querySelector(s);
+const b64 = u => btoa(String.fromCharCode(...u));
+
+/* ---------- keys (WebCrypto X25519) ---------- */
+async function genKeys() {
+  try {
+    const kp = await crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveBits']);
+    const priv = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey)).slice(-32);
+    priv[0] &= 248; priv[31] &= 127; priv[31] |= 64;           // WireGuard clamping, like `wg genkey`
+    const pub = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
+    return { priv: b64(priv), pub: b64(pub) };
+  } catch (e) {
+    throw new Error('This browser cannot generate X25519 keys. Open the page in a current Chrome, Edge, Firefox or Safari over HTTPS.');
+  }
+}
+
+/* ---------- WARP registration ---------- */
+async function register(pub) {
+  let r;
+  try {
+    r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: pub }) });
+  } catch { throw new Error('Could not reach /api/register. Check your connection and try again.'); }
+  let d = {}; try { d = await r.json(); } catch {}
+  if (r.status === 404) throw new Error('The /api/register function is not deployed. Add the functions folder to the repo and redeploy.');
+  if (!r.ok) {
+    const e = new Error(d.error || 'Registration failed (HTTP ' + r.status + ').');
+    if (d.upstream === 429 || d.upstream === 403) e.hint = 'Cloudflare may be rate-limiting you. Wait a few minutes and try again.';
+    throw e;
+  }
+  return d;
+}
+
+function resolveEndpoint(p) {
+  const e = p.endpoint || {}, ep = e.v4 || e.v6;
+  if (ep) return String(ep).replace(/:0$/, ':' + ((e.ports && e.ports[0]) || 2408)); // API returns port 0
+  return e.host || 'engage.cloudflareclient.com:2408';
+}
+
+/* ---------- QR encoder: byte mode, ECC L, versions 1-20, mask 0 ---------- */
+function makeQr(text) {
+  const data = new TextEncoder().encode(text);
+  const ECC = [0,7,10,15,20,26,18,20,24,30,18,20,24,26,30,22,24,28,30,28,28];
+  const BLK = [0,1,1,1,1,1,2,2,2,2,4,4,4,4,4,6,6,6,6,7,8];
+  const raw = v => { let r = (16*v+128)*v+64; if (v >= 2) { const n = (v/7|0)+2; r -= (25*n-10)*n-55; if (v >= 7) r -= 36; } return r >> 3; };
+  let ver = 0, cap = 0, cc = 8;
+  for (let v = 1; v <= 20; v++) {
+    cap = raw(v) - ECC[v]*BLK[v]; cc = v >= 10 ? 16 : 8;
+    if (4 + cc + 8*data.length <= cap*8) { ver = v; break; }
+  }
+  if (!ver) throw new Error('Config is too large for a QR code.');
+
+  const bits = [], push = (val, n) => { for (let i = n-1; i >= 0; i--) bits.push((val >> i) & 1); };
+  push(4, 4); push(data.length, cc); data.forEach(b => push(b, 8));
+  push(0, Math.min(4, cap*8 - bits.length));
+  while (bits.length % 8) bits.push(0);
+  const cw = [];
+  for (let i = 0; i < bits.length; i += 8) cw.push(parseInt(bits.slice(i, i+8).join(''), 2));
+  for (let p = 0xEC; cw.length < cap; p ^= 0xEC ^ 0x11) cw.push(p);
+
+  const mul = (x, y) => { let z = 0; for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >> 7) * 0x11D); z ^= ((y >> i) & 1) * x; } return z; };
+  const nb = BLK[ver], el = ECC[ver], rc = raw(ver);
+  const gen = new Array(el).fill(0); gen[el-1] = 1;
+  for (let i = 0, root = 1; i < el; i++) {
+    for (let j = 0; j < el; j++) { gen[j] = mul(gen[j], root); if (j+1 < el) gen[j] ^= gen[j+1]; }
+    root = mul(root, 2);
+  }
+  const rs = blk => { const r = new Array(el).fill(0); for (const b of blk) { const f = b ^ r.shift(); r.push(0); gen.forEach((c, i) => r[i] ^= mul(c, f)); } return r; };
+  const nShort = nb - rc % nb, shortLen = (rc / nb | 0) - el, blocks = [];
+  for (let i = 0, k = 0; i < nb; i++) {
+    const len = shortLen + (i < nShort ? 0 : 1), d = cw.slice(k, k+len); k += len;
+    const e = rs(d); if (i < nShort) d.push(0); blocks.push(d.concat(e));
+  }
+  const fin = [];
+  for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen || j >= nShort) fin.push(b[i]); });
+
+  const S = ver*4 + 17, mod = new Array(S*S).fill(0), fn = new Array(S*S).fill(false);
+  const set = (x, y, d) => { if (x >= 0 && x < S && y >= 0 && y < S) { mod[y*S+x] = d ? 1 : 0; fn[y*S+x] = true; } };
+  for (let i = 0; i < S; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+  for (const [cx, cy] of [[3,3],[S-4,3],[3,S-4]])
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const d = Math.max(Math.abs(dx), Math.abs(dy)); set(cx+dx, cy+dy, d !== 2 && d !== 4); }
+  if (ver > 1) {
+    const n = (ver/7|0)+2, step = Math.ceil((ver*4+4) / (n*2-2)) * 2, pos = [6];
+    for (let p = S-7; pos.length < n; p -= step) pos.splice(1, 0, p);
+    pos.forEach((cy, i) => pos.forEach((cx, j) => {
+      if ((i === 0 && j === 0) || (i === 0 && j === n-1) || (i === n-1 && j === 0)) return;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(cx+dx, cy+dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }));
+  }
+  // format bits (ECC L, mask 0)
+  let rem = 8; for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
+  const fb = i => (((8 << 10 | rem) ^ 0x5412) >> i) & 1;
+  for (let i = 0; i <= 5; i++) set(8, i, fb(i));
+  set(8, 7, fb(6)); set(8, 8, fb(7)); set(7, 8, fb(8));
+  for (let i = 9; i <= 14; i++) set(14-i, 8, fb(i));
+  for (let i = 0; i <= 7; i++) set(S-1-i, 8, fb(i));
+  for (let i = 8; i <= 14; i++) set(8, S-15+i, fb(i));
+  set(8, S-8, true);
+  if (ver >= 7) {
+    let r = ver; for (let i = 0; i < 12; i++) r = (r << 1) ^ ((r >> 11) * 0x1F25);
+    const vb = ver << 12 | r;
+    for (let i = 0; i < 18; i++) { const b = (vb >> i) & 1, a = S-11 + i%3, c = i/3|0; set(a, c, b); set(c, a, b); }
+  }
+  // place data, then apply mask 0
+  const total = fin.length * 8; let bi = 0;
+  for (let right = S-1; right >= 1; right -= 2) {
+    if (right === 6) right = 5;
+    for (let v = 0; v < S; v++) for (let j = 0; j < 2; j++) {
+      const x = right - j, y = ((right+1) & 2) === 0 ? S-1-v : v;
+      if (!fn[y*S+x] && bi < total) { mod[y*S+x] = (fin[bi >> 3] >> (7 - (bi & 7))) & 1; bi++; }
+    }
+  }
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (!fn[y*S+x] && (x+y) % 2 === 0) mod[y*S+x] ^= 1;
+
+  const q = 4, N = S + q*2; let path = '';
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (mod[y*S+x]) path += 'M' + (x+q) + ' ' + (y+q) + 'h1v1h-1z';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + N + ' ' + N + '" shape-rendering="crispEdges"><rect width="' + N + '" height="' + N + '" fill="#fff"/><path d="' + path + '" fill="#000"/></svg>';
+}
+
+/* ---------- UI ---------- */
+const state = { conf: '', priv: '', shown: false };
+const status = (msg, err) => { const s = $('#status'); s.textContent = msg || ''; s.className = 'status' + (err ? ' err' : ''); };
+
+function readOpts() {
+  const endpoint = $('#endpoint').value.trim();
+  if (endpoint) {
+    const m = endpoint.match(/^(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9.-]+):(\d{1,5})$/);
+    if (!m || +m[2] > 65535) throw new Error('Endpoint must look like 162.159.192.1:2408 or [2606:4700:d0::a29f:c001]:2408.');
+  }
+  const num = (id, name, lo, hi) => {
+    const v = $(id).value.trim();
+    if (!/^\d+$/.test(v) || +v < lo || +v > hi) throw new Error(name + ' must be a whole number from ' + lo + ' to ' + hi + '.');
+    return +v;
+  };
+  const o = { endpoint, dns: $('#dns').value.trim(), mtu: num('#mtu', 'MTU', 576, 1500),
+    jc: num('#jc', 'Jc', 1, 128), jmin: num('#jmin', 'Jmin', 0, 1280), jmax: num('#jmax', 'Jmax', 0, 1280) };
+  if (o.jmin > o.jmax) throw new Error('Jmin must not be larger than Jmax.');
+  return o;
+}
+
+function drawConf() {
+  const shown = state.shown;
+  $('#conf').textContent = shown ? state.conf : state.conf.replace(state.priv, '\u2022'.repeat(44));
+  $('#reveal').textContent = shown ? 'Hide private key' : 'Show private key';
+  $('#reveal').setAttribute('aria-pressed', shown);
+}
+
+/* ---------- optional template mode ---------- */
+// Keeps every line of the user's config; swaps only PrivateKey, Address (Interface) and the first Peer's PublicKey.
+function applyTemplate(text, priv, address, peerKey) {
+  const src = text.replace(/^\uFEFF/, '').split(/\r?\n/);
+  while (src.length && !src[src.length - 1].trim()) src.pop();
+  let sec = '', peers = 0, iface = -1, peer = -1;
+  const done = { pk: false, ad: false, pub: false }, out = [];
+  src.forEach(ln => {
+    const h = ln.match(/^\s*\[([^\]]+)\]\s*$/);
+    if (h) {
+      sec = h[1].trim().toLowerCase();
+      if (sec === 'interface' && iface < 0) iface = out.length;
+      if (sec === 'peer' && ++peers === 1) peer = out.length;
+      return out.push(ln);
+    }
+    const m = ln.match(/^(\s*)([A-Za-z0-9]+)(\s*=\s*)/), k = m && m[2].toLowerCase();
+    if (sec === 'interface' && k === 'privatekey' && !done.pk) { done.pk = true; return out.push(m[0] + priv); }
+    if (sec === 'interface' && k === 'address') {              // extra Address lines would keep stale IPs, so drop them
+      if (done.ad) return;
+      done.ad = true; return out.push(m[0] + address);
+    }
+    if (sec === 'peer' && peers === 1 && k === 'publickey' && !done.pub) { done.pub = true; return out.push(m[0] + peerKey); }
+    out.push(ln);
+  });
+  if (iface < 0 || peer < 0) throw new Error('The template needs an [Interface] and a [Peer] section.');
+  const ins = [];
+  if (!done.pub) ins.push([peer + 1, 'PublicKey = ' + peerKey]);
+  if (!done.ad) ins.push([iface + 1, 'Address = ' + address]);
+  if (!done.pk) ins.push([iface + 1, 'PrivateKey = ' + priv]);
+  ins.sort((a, b) => b[0] - a[0]).forEach(([i, l]) => out.splice(i, 0, l));
+  return out.join('\n') + '\n';
+}
+
+function syncTpl() {
+  const t = $('#tpl').value.trim(), on = !!t;
+  const ok = /^\s*\[interface\]/im.test(t) && /^\s*\[peer\]/im.test(t);
+  document.querySelectorAll('.fields input').forEach(i => { i.disabled = on; });
+  $('#tpl-msg').textContent = !on ? '' : ok
+    ? 'Template ready. Advanced settings are switched off while a template is in use.'
+    : 'This does not look like a config yet. It needs an [Interface] and a [Peer] section.';
+  $('#tpl-clear').hidden = !on;
+}
+
+async function run() {
+  const btn = $('#go');
+  status(''); 
+  const tplText = $('#tpl').value.trim();
+  let opts = null;
+  try {
+    if (tplText) applyTemplate(tplText, 'x', 'x', 'x');   // validate before spending a registration
+    else opts = readOpts();
+  } catch (e) { return status(e.message, true); }
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Working';
+  try {
+    status('Generating keys\u2026');
+    const { priv, pub } = await genKeys();
+    status('Registering with Cloudflare WARP\u2026');
+    const t0 = performance.now(), d = await register(pub), peer = d.peer;
+    if (!peer || !peer.public_key) throw new Error('No peer information in the WARP response.');
+    const a = d.addresses || {};
+    const address = [a.v4 && a.v4 + '/32', a.v6 && a.v6 + '/128'].filter(Boolean).join(', ');
+    if (!address) throw new Error('No client address in the WARP response.');
+    let endpoint;
+    if (tplText) {
+      state.conf = applyTemplate(tplText, priv, address, peer.public_key);
+      const em = state.conf.match(/^\s*Endpoint\s*=\s*(.+?)\s*$/im);
+      endpoint = em ? em[1] : 'not set in template';
+    } else {
+      endpoint = opts.endpoint || resolveEndpoint(peer);
+      const lines = ['[Interface]', 'PrivateKey = ' + priv, 'Address = ' + address,
+        'Jc = ' + opts.jc, 'Jmin = ' + opts.jmin, 'Jmax = ' + opts.jmax, 'H1 = 1', 'H2 = 2', 'H3 = 3', 'H4 = 4',
+        ...(opts.dns ? ['DNS = ' + opts.dns] : []), 'MTU = ' + opts.mtu, '',
+        '[Peer]', 'PublicKey = ' + peer.public_key, 'Endpoint = ' + endpoint,
+        'AllowedIPs = 0.0.0.0/0, ::/0', 'PersistentKeepalive = 25'];
+      state.conf = lines.join('\n') + '\n';
+    }
+    state.priv = priv; state.shown = false;
+
+    let qrNote = '';
+    try { $('#qr').innerHTML = makeQr(state.conf); $('#qr').hidden = false; }
+    catch (e) { $('#qr').hidden = true; qrNote = ' ' + e.message + ' Use the file instead.'; }
+    $('#m-ep').textContent = endpoint; $('#m-addr').textContent = address;
+    $('#m-acct').textContent = d.account_type || 'unknown'; $('#m-pub').textContent = pub;
+    drawConf();
+    $('#empty').hidden = true; $('#result').hidden = false;
+    status('Done in ' + ((performance.now() - t0) / 1000).toFixed(1) + 's. Generate again for a fresh device.' + qrNote);
+  } catch (e) {
+    status(e.message + (e.hint ? ' ' + e.hint : ''), true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate config';
+  }
+}
+
+if (location.protocol.startsWith('http')) $('#ps-cmd').textContent = 'irm ' + location.origin + '/iex | iex';
+$('#go').onclick = run;
+$('#tpl').addEventListener('input', syncTpl);
+$('#tpl-pick').onclick = () => $('#tpl-file').click();
+$('#tpl-clear').onclick = () => { $('#tpl').value = ''; syncTpl(); };
+$('#tpl-file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (f.size > 100000) return status('That file is too large to be a config.', true);
+  $('#tpl').value = await f.text(); syncTpl(); status('');
+  $('#tpl-box').open = true;
+};
+$('#reveal').onclick = () => { state.shown = !state.shown; drawConf(); };
+function confFile() {
+  const n = new Date(), p = x => String(x).padStart(2, '0');
+  const name = n.getFullYear() + '-' + p(n.getMonth()+1) + '-' + p(n.getDate()) + '-' + p(n.getHours()) + p(n.getMinutes()) + p(n.getSeconds()) + '.conf';
+  // octet-stream keeps Android browsers from appending ".txt" to the name
+  return new File([state.conf.replace(/\n/g, '\r\n')], name, { type: 'application/octet-stream' });
+}
+$('#dl').onclick = () => {
+  const f = confFile(), url = URL.createObjectURL(f);
+  const a = Object.assign(document.createElement('a'), { href: url, download: f.name });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+  status('Downloading ' + f.name + '. Open it with AmneziaWG.');
+};
+$('#share').onclick = async () => {
+  try { await navigator.share({ files: [confFile()], title: 'WARP config' }); }
+  catch (e) { if (e.name !== 'AbortError') status('Sharing is not available here. Use Download .conf instead.', true); }
+};
+try { // show "Share file" only where the browser can share files (most phones)
+  const t = new File(['x'], 'a.conf', { type: 'application/octet-stream' });
+  if (navigator.canShare && navigator.canShare({ files: [t] })) $('#share').hidden = false;
+} catch {}
+$('#copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(state.conf); status('Config copied to the clipboard.'); }
+  catch { status('Copy was blocked by the browser. Use Download .conf instead.', true); }
+};
+</script>
+</body>
+</html>
