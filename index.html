@@ -199,7 +199,7 @@ async function register(pub) {
   let d = {}; try { d = await r.json(); } catch {}
   if (r.status === 404) throw new Error('The /api/register function is not deployed. Add the functions folder to the repo and redeploy.');
   if (!r.ok) {
-    const e = new Error(d.error || 'Registration failed (HTTP ' + r.status + ').');
+    const e = new Error((d.error || 'Registration failed (HTTP ' + r.status + ').') + (d.detail ? ' [' + d.detail + ']' : ''));
     if (d.upstream === 429 || d.upstream === 403) e.hint = 'Cloudflare may be rate-limiting you. Wait a few minutes and try again.';
     throw e;
   }
