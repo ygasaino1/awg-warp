@@ -537,11 +537,15 @@ $('#dl').onclick = () => {
 };
 $('#share').onclick = async () => {
   try { await navigator.share({ files: [confFile()], title: 'WARP config' }); }
-  catch (e) { if (e.name !== 'AbortError') status('Sharing is not available here. Use Download .conf instead.', true); }
+  catch (e) {
+    if (e.name === 'AbortError') return;       // you closed the share sheet
+    $('#dl').click();                          // refused by the browser or OS: download instead
+    status('This browser refused to share the file (' + e.name + '), so it was downloaded instead.', true);
+  }
 };
 try { // show "Share file" only where the browser can share files (most phones)
   const t = new File(['x'], 'a.conf', { type: 'application/octet-stream' });
-  if (navigator.canShare && navigator.canShare({ files: [t] })) $('#share').hidden = false;
+  if (navigator.canShare && navigator.canShare({ files: [t] }) && matchMedia('(pointer: coarse)').matches) $('#share').hidden = false;   // touch devices only
 } catch {}
 $('#copy').onclick = async () => {
   try { await navigator.clipboard.writeText(state.conf); status('Config copied to the clipboard.'); }
